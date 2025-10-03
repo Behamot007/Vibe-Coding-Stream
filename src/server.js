@@ -321,12 +321,22 @@ const server = http.createServer(async (req, res) => {
     };
 
     if (pathname === '/api/test/twitch') {
-      sendJson(res, 200, {
-        ...responsePayload,
-        service: 'twitch',
-        status: 'ok',
-        message: 'Twitch Schnittstelle erreichbar (Simulation)'
-      });
+      try {
+        const result = await twitchChatManager.checkConnectivity();
+        sendJson(res, 200, {
+          ...responsePayload,
+          service: 'twitch',
+          status: 'ok',
+          message: result.message
+        });
+      } catch (error) {
+        sendJson(res, 503, {
+          ...responsePayload,
+          service: 'twitch',
+          status: 'error',
+          message: error.message
+        });
+      }
       return;
     }
 

@@ -38,12 +38,31 @@ Dieses Projekt stellt die Grundstruktur für eine Web-Anwendung bereit, mit der 
 | Methode | Pfad                          | Beschreibung                                  |
 | ------- | ----------------------------- | --------------------------------------------- |
 | GET     | `/api/config`                 | Liefert die komplette Konfiguration           |
-| POST    | `/api/config/twitch`          | Aktualisiert die Twitch-spezifischen Werte    |
+| POST    | `/api/config/twitch`          | Aktualisiert die Twitch-spezifischen Werte (Server verbindet/verbindet neu bei Erfolg) |
 | POST    | `/api/config/minecraft`       | Aktualisiert die Minecraft-spezifischen Werte |
 | POST    | `/api/config/commands`        | Fügt ein neues Mapping hinzu oder aktualisiert es |
 | DELETE  | `/api/config/commands/:cmd`   | Entfernt ein bestehendes Mapping              |
+| GET     | `/api/test/twitch`            | Prüft live, ob mit der gespeicherten Twitch-Konfiguration eine Chat-Verbindung aufgebaut werden kann |
 
 Die gespeicherte Konfiguration kann von Listener-Services (z. B. Twitch Chat Bot, Minecraft Remote Control) eingelesen werden, um den Eventfluss aufzubauen.
+
+## Aktuelle Wege zur Generierung eines Twitch-Chat-Tokens
+
+Der ehemals populäre "Twitchapps TMI Token Generator" ist seit Anfang 2024 nicht mehr verfügbar. Für neue Tokens empfiehlt sich einer der offiziell unterstützten OAuth-Flows. Die folgenden Schritte beschreiben den pragmatischen Weg über die [Twitch CLI](https://dev.twitch.tv/docs/cli), weil darüber ein kompletter Login samt Token-Verwaltung abgebildet werden kann:
+
+1. **Twitch CLI installieren** – Lade das passende Paket für dein Betriebssystem herunter und stelle sicher, dass es im `PATH` liegt.
+2. **Client anlegen** – Erstelle im [Twitch Developer Dashboard](https://dev.twitch.tv/console/apps) eine neue Anwendung. Notiere dir `Client ID` und `Client Secret`.
+3. **CLI konfigurieren** – Führe `twitch configure` aus und trage die beiden Werte ein. Hinterlege als Redirect-URL `http://localhost:3000` (oder eine andere lokale Adresse, die du verwenden möchtest).
+4. **Login durchführen** – Starte `twitch login --scopes "chat:read chat:edit"`. Die CLI öffnet den Browser, du bestätigst die angeforderten Berechtigungen und erhältst anschließend einen Access Token.
+5. **Token nutzen** – Die CLI zeigt den OAuth-Token an und speichert ihn lokal. Verwende diesen Wert als `oauth:...`-Passwort für IRC-Verbindungen (z. B. mit `tmi.js`).
+
+Alternativ kannst du die gleichen Schritte manuell über den Authorization-Code-Flow durchführen. Beachte dabei, dass Twitch-Access-Tokens zeitlich begrenzt sind: Bewahre das `refresh_token` sicher auf und erneuere den Token regelmäßig über `https://id.twitch.tv/oauth2/token`.
+
+### Schnelle Tokens über den Twitch Token Generator
+
+In der Web-Oberfläche steht zusätzlich eine Schaltfläche **„Twitch Token Generator testen“** bereit. Damit wird [twitchtokengenerator.com](https://twitchtokengenerator.com) geöffnet, wo du testweise ein `oauth:`-Token für Chat-Anwendungen erstellen kannst. Achte darauf, dass der erzeugte Wert mit `oauth:` beginnt – falls nicht, ergänze das Präfix im Formular. Tokens aus diesem Tool besitzen eine begrenzte Gültigkeit und sollten regelmäßig erneuert werden.
+
+Nach dem Speichern der Konfiguration versucht der Server automatisch, eine Twitch-Chat-Verbindung aufzubauen. Über den Button **„Verbindung testen“** wird `/api/test/twitch` aufgerufen, das mit den gespeicherten Zugangsdaten eine echte Verbindung prüft und das Ergebnis direkt anzeigt. Erfolgreiche sowie fehlgeschlagene Verbindungsversuche werden außerdem im Chat-Log (Server-Sent Events) protokolliert.
 
 ## Weiteres Vorgehen
 

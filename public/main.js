@@ -124,9 +124,11 @@ async function init() {
     setStatus(twitchStatus, 'Prüfe Verbindung …', 'info');
     try {
       const result = await testConnection('/api/test/twitch');
+      const timeLabel = new Date(result.timestamp).toLocaleTimeString();
+      const details = result.message ? ` – ${result.message}` : '';
       setStatus(
         twitchStatus,
-        `${result.service}: ${result.status.toUpperCase()} (${new Date(result.timestamp).toLocaleTimeString()})`,
+        `${result.service}: ${result.status.toUpperCase()} (${timeLabel})${details}`,
         'success'
       );
     } catch (error) {
