@@ -17,6 +17,9 @@ const defaultConfig = {
     clientId: '',
     clientSecret: '',
     oauthToken: '',
+    accessToken: '',
+    refreshToken: '',
+    tokenExpiresAt: '',
     channel: ''
   },
   minecraft: {
@@ -54,6 +57,21 @@ function saveConfig(config) {
 
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(safeConfig, null, 2));
   return safeConfig;
+}
+
+function persistTwitchConfig(partial = {}) {
+  if (!partial || typeof partial !== 'object') {
+    return loadConfig().twitch;
+  }
+
+  const current = loadConfig();
+  const next = {
+    ...current,
+    twitch: { ...current.twitch, ...partial }
+  };
+
+  saveConfig(next);
+  return next.twitch;
 }
 
 function parseBody(req) {
@@ -153,6 +171,7 @@ function pushChatEntry(entry) {
 
 const twitchChatManager = new TwitchChatManager({
   loadConfig,
+  persistTwitchConfig,
   onChatMessage: ({ username, message }) => {
     pushChatEntry(
       createChatEntry({
