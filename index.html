@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Twitch Chat Bridge</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/tmi.js/1.8.5/tmi.min.js" integrity="sha512-N48qIiwkIm4U3XhOA/HHe5ZWKjMn4v9KD4lJUtYv8lrqbGR9O7Fit3Zkh8Y7oRWqcQimKRL8s6sHY2W9qdnq7g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script defer src="app.js"></script>
+  </head>
+  <body>
+    <header class="hero">
+      <h1>Twitch Live Chat Dashboard</h1>
+      <p>
+        Verbinde deinen Twitch-Account, sende Nachrichten in den Chat und verfolge
+        eingehende Nachrichten in Echtzeit.
+      </p>
+    </header>
+
+    <main class="content">
+      <section class="card">
+        <h2>1. Mit Twitch verbinden</h2>
+        <p class="hint">
+          Du benötigst einen
+          <a href="https://dev.twitch.tv/docs/irc/get-started#generating-an-oauth-token" target="_blank" rel="noopener noreferrer"
+            >OAuth-Token</a
+          >, der mit dem Präfix <code>oauth:</code> beginnt.
+        </p>
+        <form id="connection-form" class="form">
+          <label>
+            Benutzername
+            <input type="text" id="username" name="username" autocomplete="nickname" required />
+          </label>
+          <label>
+            OAuth-Token
+            <input
+              type="password"
+              id="token"
+              name="token"
+              placeholder="oauth:xxxxxxxxxxxxxxxxxxxxxx"
+              required
+            />
+          </label>
+          <label>
+            Channel (ohne #)
+            <input type="text" id="channel" name="channel" placeholder="kanalname" required />
+          </label>
+          <button type="submit" class="primary">Verbinden</button>
+          <button type="button" id="disconnect" class="secondary" disabled>Trennen</button>
+        </form>
+        <p id="status" class="status">Nicht verbunden</p>
+      </section>
+
+      <section class="card">
+        <h2>2. Nachricht senden</h2>
+        <form id="message-form" class="form">
+          <label>
+            Nachricht
+            <input
+              type="text"
+              id="message"
+              name="message"
+              placeholder="Sag hallo zum Chat!"
+              required
+            />
+          </label>
+          <button type="submit" class="primary" disabled id="send">Senden</button>
+        </form>
+      </section>
+
+      <section class="card chat">
+        <div class="chat-header">
+          <h2>Live-Chat</h2>
+          <button type="button" id="clear" class="secondary">Verlauf löschen</button>
+        </div>
+        <ul id="chat-log" class="chat-log" aria-live="polite"></ul>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>
+        Hinweis: Für produktive Einsätze sollten OAuth-Token sicher aufbewahrt werden. Dieses Demo-Tool
+        speichert keine Daten und läuft vollständig im Browser.
+      </p>
+    </footer>
+  </body>
+</html>
