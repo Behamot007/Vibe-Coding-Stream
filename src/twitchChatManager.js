@@ -16,8 +16,10 @@ class TwitchChatManager extends EventEmitter {
     this.client = null;
     this.connected = false;
     this.activeConfig = null;
+    this.pendingConnection = false;
 
     this.updateConfig(this.loadConfig().twitch || {});
+    this.ensureConnected();
   }
 
   hasValidConfig(config) {
@@ -58,6 +60,7 @@ class TwitchChatManager extends EventEmitter {
 
   disconnect(reason) {
     this.connected = false;
+    this.pendingConnection = false;
     if (this.client) {
       try {
         this.client.removeAllListeners();
@@ -99,6 +102,18 @@ class TwitchChatManager extends EventEmitter {
     }
 
     this.activeConfig = { ...twitchConfig };
+    this.ensureConnected(true);
+  }
+
+  ensureConnected(force = false) {
+    if (!tmi || !this.activeConfig) {
+      return;
+    }
+
+    if (!force && (this.connected || this.pendingConnection)) {
+      return;
+    }
+
     this.connect();
   }
 
@@ -108,6 +123,7 @@ class TwitchChatManager extends EventEmitter {
     }
 
     this.disconnect();
+    this.pendingConnection = true;
 
     const channel = this.sanitizeChannel(this.activeConfig.channel);
     const token = this.sanitizeToken(this.activeConfig.oauthToken);
@@ -124,11 +140,13 @@ class TwitchChatManager extends EventEmitter {
 
     this.client.on('connected', () => {
       this.connected = true;
+      this.pendingConnection = false;
       this.emitStatus(`Mit Twitch-Chat ${channel} verbunden.`);
     });
 
     this.client.on('disconnected', reason => {
       this.connected = false;
+      this.pendingConnection = false;
       this.emitStatus(`Twitch-Chat getrennt: ${reason || 'unbekannt'}.`);
     });
 
@@ -148,6 +166,7 @@ class TwitchChatManager extends EventEmitter {
 
     this.client.connect().catch(error => {
       this.connected = false;
+      this.pendingConnection = false;
       this.emitStatus(`Twitch-Chat Verbindung fehlgeschlagen: ${error.message}`);
     });
   }
@@ -158,6 +177,117 @@ class TwitchChatManager extends EventEmitter {
     }
     const channel = this.sanitizeChannel(this.activeConfig.channel);
     await this.client.say(channel, message);
+  }
+
+  async checkConnectivity(timeoutMs = 8000) {
+    if (!tmi) {
+      throw new Error('tmi.js konnte nicht geladen werden.');
+    }
+
+    if (!this.hasValidConfig(this.activeConfig)) {
+      throw new Error('Twitch Konfiguration unvollständig.');
+    }
+
+    if (this.pendingConnection) {
+      return new Promise((resolve, reject) => {
+        const deadline = Date.now() + timeoutMs;
+        const awaitState = () => {
+          if (this.connected) {
+            resolve({
+              status: 'connected',
+              message: `Aktive Verbindung zu ${this.sanitizeChannel(this.activeConfig.channel)}.`
+            });
+            return;
+          }
+
+          if (!this.pendingConnection) {
+            reject(new Error('Aktuell keine aktive Verbindung.'));
+            return;
+          }
+
+          if (Date.now() > deadline) {
+            reject(new Error('Timeout beim Verbindungsaufbau.'));
+            return;
+          }
+
+          setTimeout(awaitState, 250);
+        };
+
+        awaitState();
+      });
+    }
+
+    if (this.connected) {
+      return {
+        status: 'connected',
+        message: 'Bereits mit dem Twitch Chat verbunden.'
+      };
+    }
+
+    const channel = this.sanitizeChannel(this.activeConfig.channel);
+    const token = this.sanitizeToken(this.activeConfig.oauthToken);
+
+    const probeClient = new tmi.Client({
+      options: { debug: false },
+      identity: {
+        username: this.activeConfig.username,
+        password: token
+      },
+      channels: [channel],
+      connection: { reconnect: false, secure: true }
+    });
+
+    return new Promise((resolve, reject) => {
+      let finished = false;
+
+      const cleanup = () => {
+        probeClient.removeAllListeners();
+        probeClient.disconnect().catch(() => {});
+      };
+
+      const timeout = setTimeout(() => {
+        if (finished) {
+          return;
+        }
+        finished = true;
+        cleanup();
+        reject(new Error('Timeout beim Verbindungsaufbau.'));
+      }, timeoutMs);
+
+      probeClient.on('connected', () => {
+        if (finished) {
+          return;
+        }
+        finished = true;
+        clearTimeout(timeout);
+        cleanup();
+        this.ensureConnected();
+        resolve({
+          status: 'connected',
+          message: `Erfolgreich mit ${channel} verbunden.`
+        });
+      });
+
+      probeClient.on('disconnected', reason => {
+        if (finished) {
+          return;
+        }
+        finished = true;
+        clearTimeout(timeout);
+        cleanup();
+        reject(new Error(`Verbindung getrennt: ${reason || 'unbekannt'}`));
+      });
+
+      probeClient.connect().catch(error => {
+        if (finished) {
+          return;
+        }
+        finished = true;
+        clearTimeout(timeout);
+        cleanup();
+        reject(error);
+      });
+    });
   }
 }
 
