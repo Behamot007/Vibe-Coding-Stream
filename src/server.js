@@ -2,6 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { URL } = require('url');
+const { TwitchChatManager } = require('./twitchChatManager');
 
 const CONFIG_PATH = path.join(__dirname, '..', 'config', 'settings.json');
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
@@ -117,6 +118,31 @@ function broadcastEvent(eventName, data) {
   });
 }
 
+function createChatEntry({
+  username,
+  message,
+  direction = 'incoming',
+  transport = 'twitch',
+  timestamp,
+  id
+}) {
+  const normalizedDirection = ['incoming', 'outgoing', 'system'].includes(direction)
+    ? direction
+    : 'incoming';
+  const normalizedTransport = transport || 'twitch';
+  const normalizedMessage = message != null ? message.toString() : '';
+
+  return {
+    id:
+      id || `${Date.now()}-${Math.random().toString(36).slice(2, 8).toLowerCase()}`,
+    timestamp: timestamp || new Date().toISOString(),
+    username: username || 'Unbekannt',
+    message: normalizedMessage,
+    direction: normalizedDirection,
+    transport: normalizedTransport
+  };
+}
+
 function pushChatEntry(entry) {
   chatHistory.push(entry);
   if (chatHistory.length > CHAT_HISTORY_LIMIT) {
@@ -124,6 +150,30 @@ function pushChatEntry(entry) {
   }
   broadcastEvent('message', entry);
 }
+
+const twitchChatManager = new TwitchChatManager({
+  loadConfig,
+  onChatMessage: ({ username, message }) => {
+    pushChatEntry(
+      createChatEntry({
+        username,
+        message,
+        direction: 'incoming',
+        transport: 'twitch'
+      })
+    );
+  },
+  onStatus: statusMessage => {
+    pushChatEntry(
+      createChatEntry({
+        username: 'System',
+        message: statusMessage,
+        direction: 'system',
+        transport: 'twitch'
+      })
+    );
+  }
+});
 
 function serveStatic(res, pathname) {
   const filePath = path.join(PUBLIC_DIR, pathname === '/' ? 'index.html' : pathname);
@@ -205,21 +255,36 @@ const server = http.createServer(async (req, res) => {
       const direction = body.direction === 'outgoing' ? 'outgoing' : 'incoming';
       const transport = body.transport?.toString().trim() || 'twitch';
 
-      const entry = {
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        timestamp: new Date().toISOString(),
-        username,
-        message,
-        direction,
-        transport
-      };
+      const entry = createChatEntry({ username, message, direction, transport });
+
+      if (entry.direction === 'outgoing' && entry.transport === 'twitch') {
+        try {
+          await twitchChatManager.sendMessage(entry.message);
+        } catch (error) {
+          console.error('Failed to send Twitch chat message', error);
+          sendJson(res, 502, {
+            message: 'Twitch-Chat Nachricht konnte nicht gesendet werden.',
+            error: error.message
+          });
+          return;
+        }
+      }
 
       pushChatEntry(entry);
 
+      const status =
+        entry.direction === 'outgoing' && entry.transport === 'twitch'
+          ? 'sent'
+          : 'stored';
+      const note =
+        status === 'sent'
+          ? 'Chatnachricht wurde an Twitch übermittelt.'
+          : 'Chatnachricht wurde gespeichert.';
+
       sendJson(res, 200, {
-        status: 'stored',
+        status,
         entry,
-        note: 'Chatnachrichten werden aktuell nur lokal protokolliert.'
+        note
       });
     } catch (error) {
       console.error('Failed to store chat message', error);
@@ -294,6 +359,7 @@ const server = http.createServer(async (req, res) => {
           ...config,
           twitch: { ...config.twitch, ...body }
         });
+        twitchChatManager.updateConfig(config.twitch);
         sendJson(res, 200, config.twitch);
         return;
       }

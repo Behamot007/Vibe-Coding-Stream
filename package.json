@@ -14,5 +14,8 @@
   ],
   "author": "",
   "license": "ISC",
-  "type": "commonjs"
+  "type": "commonjs",
+  "dependencies": {
+    "tmi.js": "^1.8.5"
+  }
 }
