@@ -1,0 +1,16 @@
+{
+  "twitch": {
+    "username": "",
+    "clientId": "",
+    "clientSecret": "",
+    "oauthToken": "",
+    "channel": ""
+  },
+  "minecraft": {
+    "host": "",
+    "rconPort": 25575,
+    "rconPassword": "",
+    "scriptBasePath": ""
+  },
+  "commandMappings": []
+}
