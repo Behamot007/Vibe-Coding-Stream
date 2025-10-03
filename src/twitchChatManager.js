@@ -193,6 +193,14 @@ class TwitchChatManager extends EventEmitter {
     return this.tokenPromise;
   }
 
+  canAutoRefreshToken(config = this.activeConfig) {
+    if (!config) {
+      return false;
+    }
+    const { clientId, clientSecret, refreshToken } = config;
+    return Boolean(clientId && clientSecret && refreshToken);
+  }
+
   async resolveRawToken({ forceValidate = false } = {}) {
     if (!this.activeConfig) {
       throw new Error('Keine Twitch Konfiguration geladen.');
@@ -240,6 +248,8 @@ class TwitchChatManager extends EventEmitter {
       }
     }
 
+    const canAutoRefresh = this.canAutoRefreshToken();
+
     if (!validation?.valid && validation?.reason !== 'invalid') {
       if (forceValidate) {
         this.emitStatus('Token Validierung nicht möglich – nutze gespeicherten Access Token für Verbindungsversuch.');
@@ -247,9 +257,9 @@ class TwitchChatManager extends EventEmitter {
       return accessToken;
     }
 
-    if (!this.activeConfig.refreshToken || !this.activeConfig.clientId || !this.activeConfig.clientSecret) {
+    if (!canAutoRefresh) {
       throw new Error(
-        'Access Token ungültig oder abgelaufen und kein Refresh Token konfiguriert. Bitte neue Zugangsdaten speichern.'
+        'Access Token ungültig oder abgelaufen. Für automatischen Refresh wird ein Client Secret einer eigenen Twitch-App benötigt. Bitte Token manuell erneuern.'
       );
     }
 
@@ -304,6 +314,13 @@ class TwitchChatManager extends EventEmitter {
 
   async refreshAccessToken() {
     const { clientId, clientSecret, refreshToken } = this.activeConfig;
+
+    if (!this.canAutoRefreshToken()) {
+      throw new Error(
+        'Token Refresh nicht möglich: Client ID, Client Secret und Refresh Token werden benötigt.'
+      );
+    }
+
     const params = new URLSearchParams({
       grant_type: 'refresh_token',
       refresh_token: refreshToken,
