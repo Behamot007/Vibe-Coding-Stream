@@ -98,8 +98,13 @@ async function init() {
   });
 
   document.getElementById('twitch-oauth-button').addEventListener('click', () => {
-    setStatus(twitchStatus, 'Öffne Twitch OAuth Tool …', 'info');
+    setStatus(twitchStatus, 'Öffne offizielles Twitch OAuth Tool …', 'info');
     window.open('https://twitchapps.com/tmi/', '_blank', 'noopener');
+  });
+
+  document.getElementById('twitch-token-generator-button').addEventListener('click', () => {
+    setStatus(twitchStatus, 'Öffne Twitch Token Generator zum Testen …', 'info');
+    window.open('https://twitchtokengenerator.com', '_blank', 'noopener');
   });
 
   document.getElementById('twitch-form').addEventListener('submit', async event => {
