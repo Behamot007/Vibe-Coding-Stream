@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Event Bridge Konfiguration</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>Event Bridge Konfiguration</h1>
+      <section>
+        <h2>Twitch Schnittstelle</h2>
+        <form id="twitch-form">
+          <div class="form-row">
+            <label for="twitch-username">Benutzername</label>
+            <input id="twitch-username" name="username" required />
+          </div>
+          <div class="form-row">
+            <label for="twitch-clientId">Client ID</label>
+            <input id="twitch-clientId" name="clientId" />
+          </div>
+          <div class="form-row">
+            <label for="twitch-clientSecret">Client Secret</label>
+            <input id="twitch-clientSecret" name="clientSecret" type="password" />
+          </div>
+          <div class="form-row">
+            <label for="twitch-token">OAuth Token</label>
+            <input id="twitch-token" name="oauthToken" type="password" />
+          </div>
+          <div class="form-row">
+            <label for="twitch-channel">Channel</label>
+            <input id="twitch-channel" name="channel" />
+          </div>
+          <button type="submit">Speichern</button>
+        </form>
+      </section>
+
+      <section>
+        <h2>Minecraft Schnittstelle</h2>
+        <form id="minecraft-form">
+          <div class="form-row">
+            <label for="minecraft-host">Host</label>
+            <input id="minecraft-host" name="host" />
+          </div>
+          <div class="form-row">
+            <label for="minecraft-port">RCON Port</label>
+            <input id="minecraft-port" name="rconPort" type="number" min="1" max="65535" />
+          </div>
+          <div class="form-row">
+            <label for="minecraft-password">RCON Passwort</label>
+            <input id="minecraft-password" name="rconPassword" type="password" />
+          </div>
+          <div class="form-row">
+            <label for="minecraft-scriptBasePath">Script Basis Pfad</label>
+            <input id="minecraft-scriptBasePath" name="scriptBasePath" />
+          </div>
+          <button type="submit">Speichern</button>
+        </form>
+      </section>
+
+      <section>
+        <h2>Command Mapping</h2>
+        <form id="command-form">
+          <div class="form-row">
+            <label for="command-command">Chat Befehl</label>
+            <input id="command-command" name="command" placeholder="z.B. !start" required />
+          </div>
+          <div class="form-row">
+            <label for="command-script">Script Name</label>
+            <input id="command-script" name="scriptName" placeholder="z.B. start_event.sh" required />
+          </div>
+          <div class="form-row">
+            <label for="command-description">Beschreibung</label>
+            <input id="command-description" name="description" placeholder="Optionale Beschreibung" />
+          </div>
+          <button type="submit">Hinzufügen / Aktualisieren</button>
+        </form>
+        <table id="command-table">
+          <thead>
+            <tr>
+              <th>Chat Befehl</th>
+              <th>Script</th>
+              <th>Beschreibung</th>
+              <th>Aktionen</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </section>
+    </main>
+
+    <template id="command-row-template">
+      <tr>
+        <td class="command"></td>
+        <td class="script"></td>
+        <td class="description"></td>
+        <td>
+          <button class="delete">Löschen</button>
+        </td>
+      </tr>
+    </template>
+
+    <script src="main.js"></script>
+  </body>
+</html>
