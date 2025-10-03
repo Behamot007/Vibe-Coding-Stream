@@ -6,6 +6,10 @@ const { URL } = require('url');
 const CONFIG_PATH = path.join(__dirname, '..', 'config', 'settings.json');
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 
+const chatClients = new Set();
+const chatHistory = [];
+const CHAT_HISTORY_LIMIT = 500;
+
 const defaultConfig = {
   twitch: {
     username: '',
@@ -92,6 +96,35 @@ function handleOptions(res) {
   res.end();
 }
 
+function sendEvent(res, eventName, data) {
+  res.write(`event: ${eventName}\n`);
+  res.write(`data: ${JSON.stringify(data)}\n\n`);
+}
+
+function broadcastEvent(eventName, data) {
+  chatClients.forEach(client => {
+    try {
+      sendEvent(client.res, eventName, data);
+    } catch (error) {
+      console.error('Failed to push SSE event:', error);
+      chatClients.delete(client);
+      try {
+        client.res.end();
+      } catch (endError) {
+        console.error('Failed to close SSE client connection:', endError);
+      }
+    }
+  });
+}
+
+function pushChatEntry(entry) {
+  chatHistory.push(entry);
+  if (chatHistory.length > CHAT_HISTORY_LIMIT) {
+    chatHistory.shift();
+  }
+  broadcastEvent('message', entry);
+}
+
 function serveStatic(res, pathname) {
   const filePath = path.join(PUBLIC_DIR, pathname === '/' ? 'index.html' : pathname);
   if (!filePath.startsWith(PUBLIC_DIR)) {
@@ -124,6 +157,125 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === 'OPTIONS') {
     handleOptions(res);
+    return;
+  }
+
+  if (pathname === '/api/chat/stream') {
+    if (req.method !== 'GET') {
+      sendJson(res, 405, { message: 'Method not allowed' });
+      return;
+    }
+
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+      'Access-Control-Allow-Origin': '*'
+    });
+
+    const client = { res };
+    chatClients.add(client);
+
+    chatHistory.forEach(entry => {
+      sendEvent(res, 'message', entry);
+    });
+
+    req.on('close', () => {
+      chatClients.delete(client);
+    });
+    return;
+  }
+
+  if (pathname === '/api/chat/message') {
+    if (req.method !== 'POST') {
+      sendJson(res, 405, { message: 'Method not allowed' });
+      return;
+    }
+
+    try {
+      const body = await parseBody(req);
+      const message = body.message?.toString().trim();
+      if (!message) {
+        sendJson(res, 400, { message: 'message is required.' });
+        return;
+      }
+
+      const config = loadConfig();
+      const username = body.username?.toString().trim() || config.twitch.username || 'Unbekannt';
+      const direction = body.direction === 'outgoing' ? 'outgoing' : 'incoming';
+      const transport = body.transport?.toString().trim() || 'twitch';
+
+      const entry = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        timestamp: new Date().toISOString(),
+        username,
+        message,
+        direction,
+        transport
+      };
+
+      pushChatEntry(entry);
+
+      sendJson(res, 200, {
+        status: 'stored',
+        entry,
+        note: 'Chatnachrichten werden aktuell nur lokal protokolliert.'
+      });
+    } catch (error) {
+      console.error('Failed to store chat message', error);
+      sendJson(res, 500, { message: 'Failed to store chat message', error: error.message });
+    }
+    return;
+  }
+
+  if (pathname === '/api/chat') {
+    if (req.method === 'GET') {
+      sendJson(res, 200, { messages: chatHistory });
+      return;
+    }
+
+    if (req.method === 'DELETE') {
+      chatHistory.length = 0;
+      broadcastEvent('clear', { timestamp: new Date().toISOString() });
+      sendJson(res, 200, { status: 'cleared' });
+      return;
+    }
+
+    sendJson(res, 405, { message: 'Method not allowed' });
+    return;
+  }
+
+  if (pathname.startsWith('/api/test/')) {
+    if (req.method !== 'GET') {
+      sendJson(res, 405, { message: 'Method not allowed' });
+      return;
+    }
+
+    const responsePayload = {
+      timestamp: new Date().toISOString()
+    };
+
+    if (pathname === '/api/test/twitch') {
+      sendJson(res, 200, {
+        ...responsePayload,
+        service: 'twitch',
+        status: 'ok',
+        message: 'Twitch Schnittstelle erreichbar (Simulation)'
+      });
+      return;
+    }
+
+    if (pathname === '/api/test/minecraft') {
+      sendJson(res, 200, {
+        ...responsePayload,
+        service: 'minecraft',
+        status: 'ok',
+        message: 'Minecraft Schnittstelle erreichbar (Simulation)'
+      });
+      return;
+    }
+
+    sendJson(res, 404, { message: 'Test-Schnittstelle nicht gefunden' });
     return;
   }
 
