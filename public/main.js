@@ -126,10 +126,19 @@ async function init() {
       const result = await testConnection('/api/test/twitch');
       const timeLabel = new Date(result.timestamp).toLocaleTimeString();
       const details = result.message ? ` – ${result.message}` : '';
+      const statusLabel = (result.status || 'unbekannt').toUpperCase();
+      const toneMap = {
+        ok: 'success',
+        connected: 'success',
+        offline: 'warning',
+        unconfigured: 'warning',
+        error: 'error'
+      };
+      const tone = toneMap[result.status] || 'info';
       setStatus(
         twitchStatus,
-        `${result.service}: ${result.status.toUpperCase()} (${timeLabel})${details}`,
-        'success'
+        `${result.service}: ${statusLabel} (${timeLabel})${details}`,
+        tone
       );
     } catch (error) {
       setStatus(twitchStatus, error.message, 'error');

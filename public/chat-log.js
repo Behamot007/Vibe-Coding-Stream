@@ -16,6 +16,19 @@ let currentIdentity = '';
 let eventSource = null;
 let connectionState = 'disconnected';
 
+function toneForDeliveryStatus(status) {
+  switch (status) {
+    case 'sent':
+      return 'success';
+    case 'queued':
+      return 'warning';
+    case 'stored':
+      return 'info';
+    default:
+      return 'info';
+  }
+}
+
 const timeFormatter = new Intl.DateTimeFormat('de-DE', {
   hour: '2-digit',
   minute: '2-digit',
@@ -206,14 +219,15 @@ sendForm.addEventListener('submit', async event => {
   try {
     sendButton.disabled = true;
     setStatus('Sende Nachricht …', 'info');
-    await postChatMessage({
+    const result = await postChatMessage({
       username: currentIdentity,
       message,
       direction: 'outgoing',
       transport: 'twitch'
     });
     messageInput.value = '';
-    setStatus('Nachricht an den Chat übermittelt (lokales Protokoll).', 'success');
+    const note = result?.note || 'Nachricht an den Chat übermittelt (lokales Protokoll).';
+    setStatus(note, toneForDeliveryStatus(result?.status));
   } catch (error) {
     console.error('Failed to send chat message', error);
     setStatus(`Fehler beim Senden: ${error.message}`, 'error');
@@ -257,13 +271,14 @@ previewButton.addEventListener('click', async () => {
 
   try {
     setStatus('Füge Testeintrag hinzu …', 'info');
-    await postChatMessage({
+    const result = await postChatMessage({
       username,
       message,
       direction: 'incoming',
       transport: 'simulation'
     });
-    setStatus('Testeintrag erstellt.', 'success');
+    const note = result?.note || 'Testeintrag erstellt.';
+    setStatus(note, toneForDeliveryStatus(result?.status));
   } catch (error) {
     console.error('Failed to create preview entry', error);
     setStatus(`Testeintrag fehlgeschlagen: ${error.message}`, 'error');
