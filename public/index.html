@@ -97,6 +97,46 @@
                 />
                 <p class="field-hint">Bewahre diesen Wert sicher auf und teile ihn nicht öffentlich.</p>
               </div>
+              <div class="form-row">
+                <label for="twitch-accessToken">Access Token (optional)</label>
+                <input
+                  id="twitch-accessToken"
+                  name="accessToken"
+                  type="password"
+                  placeholder="Access Token von Twitch"
+                />
+                <p class="field-hint">
+                  Falls du statt eines <code>oauth:</code>-Tokens lieber einen Access Token (z. B. vom Twitch Token
+                  Generator) speicherst, trage ihn hier ein. Der Server aktualisiert diesen Token automatisch, wenn auch
+                  ein Refresh Token hinterlegt ist.
+                </p>
+              </div>
+              <div class="form-row">
+                <label for="twitch-refreshToken">Refresh Token</label>
+                <input
+                  id="twitch-refreshToken"
+                  name="refreshToken"
+                  type="password"
+                  placeholder="Refresh Token"
+                />
+                <p class="field-hint">
+                  Erforderlich für automatische Verlängerung. Du erhältst ihn im Authorization-Code-Flow oder beim Twitch
+                  Token Generator, wenn du das Häkchen bei „Provide Refresh Token" setzt.
+                </p>
+              </div>
+              <div class="form-row">
+                <label for="twitch-tokenExpiresAt">Token läuft ab (UTC)</label>
+                <input
+                  id="twitch-tokenExpiresAt"
+                  name="tokenExpiresAt"
+                  readonly
+                  placeholder="Wird nach erfolgreicher Prüfung automatisch gesetzt"
+                />
+                <p class="field-hint">
+                  Dieser Wert wird automatisch gepflegt, sobald der Server den Access Token validiert oder erneuert.
+                  Manuelles Anpassen ist nicht erforderlich.
+                </p>
+              </div>
             </div>
           </details>
 

@@ -4,7 +4,7 @@ Dieses Projekt stellt die Grundstruktur für eine Web-Anwendung bereit, mit der 
 
 ## Überblick
 
-- **Twitch Schnittstelle**: Konfiguriere Benutzername, Client-Informationen und OAuth-Token des gewünschten Twitch-Kontos. Über die API-Endpunkte kann später ein Chat-Listener implementiert werden, der Befehle von Zuschauer:innen entgegennimmt.
+- **Twitch Schnittstelle**: Konfiguriere Benutzername, Client-Informationen und OAuth-/Access-Token des gewünschten Twitch-Kontos. Der Server validiert Access Tokens automatisch über die Twitch OAuth-Endpoints und erneuert sie mithilfe eines gespeicherten Refresh Tokens.
 - **Minecraft Schnittstelle**: Hinterlege Host, RCON-Port, Passwort und einen Basis-Pfad für Skripte, die auf dem dedizierten Server liegen. Die Konfiguration bildet die Grundlage für spätere Trigger, die Minecraft-Ereignisse auslösen.
 - **Command Mapping**: Ordne Klartext-Chatbefehle konkreten Skriptnamen zu. Diese Mappings werden genutzt, um aus Twitch-Nachrichten auslösbare Events zu erzeugen.
 
@@ -24,7 +24,7 @@ Dieses Projekt stellt die Grundstruktur für eine Web-Anwendung bereit, mit der 
 
 ## Nutzung
 
-1. **Abhängigkeiten installieren**: Das Projekt kommt ohne externe Pakete aus und nutzt ausschließlich Node.js Kernmodule, damit es auch in eingeschränkten Umgebungen läuft.
+1. **Abhängigkeiten installieren**: Die Anwendung benötigt lediglich Node.js (inkl. integriertem `fetch`) sowie das Paket `tmi.js`, das bereits als Abhängigkeit eingetragen ist.
 2. **Server starten**:
 
    ```bash
@@ -48,21 +48,23 @@ Die gespeicherte Konfiguration kann von Listener-Services (z. B. Twitch Chat B
 
 ## Aktuelle Wege zur Generierung eines Twitch-Chat-Tokens
 
-Der ehemals populäre "Twitchapps TMI Token Generator" ist seit Anfang 2024 nicht mehr verfügbar. Für neue Tokens empfiehlt sich einer der offiziell unterstützten OAuth-Flows. Die folgenden Schritte beschreiben den pragmatischen Weg über die [Twitch CLI](https://dev.twitch.tv/docs/cli), weil darüber ein kompletter Login samt Token-Verwaltung abgebildet werden kann:
+Twitch verlangt seit 2023 für Chat-Interaktionen gültige OAuth-Tokens mit den Scopes `chat:read` und `chat:edit`. Du hast zwei praktikable Wege, um diese Tokens zu erhalten:
 
-1. **Twitch CLI installieren** – Lade das passende Paket für dein Betriebssystem herunter und stelle sicher, dass es im `PATH` liegt.
-2. **Client anlegen** – Erstelle im [Twitch Developer Dashboard](https://dev.twitch.tv/console/apps) eine neue Anwendung. Notiere dir `Client ID` und `Client Secret`.
-3. **CLI konfigurieren** – Führe `twitch configure` aus und trage die beiden Werte ein. Hinterlege als Redirect-URL `http://localhost:3000` (oder eine andere lokale Adresse, die du verwenden möchtest).
-4. **Login durchführen** – Starte `twitch login --scopes "chat:read chat:edit"`. Die CLI öffnet den Browser, du bestätigst die angeforderten Berechtigungen und erhältst anschließend einen Access Token.
-5. **Token nutzen** – Die CLI zeigt den OAuth-Token an und speichert ihn lokal. Verwende diesen Wert als `oauth:...`-Passwort für IRC-Verbindungen (z. B. mit `tmi.js`).
+### 1. Offizieller Authorization-Code-Flow (empfohlen für Produktion)
 
-Alternativ kannst du die gleichen Schritte manuell über den Authorization-Code-Flow durchführen. Beachte dabei, dass Twitch-Access-Tokens zeitlich begrenzt sind: Bewahre das `refresh_token` sicher auf und erneuere den Token regelmäßig über `https://id.twitch.tv/oauth2/token`.
+1. **Client anlegen** – Erstelle im [Twitch Developer Dashboard](https://dev.twitch.tv/console/apps) eine Anwendung und notiere `Client ID` sowie `Client Secret`.
+2. **Authorization-Code-Flow starten** – Öffne die URL `https://id.twitch.tv/oauth2/authorize?response_type=code&client_id=<CLIENT_ID>&redirect_uri=<REDIRECT_URL>&scope=chat:read+chat:edit+user:read:email` im Browser, bestätige die Berechtigungen und kopiere den zurückgelieferten `code`.
+3. **Tokens austauschen** – Sende per `POST https://id.twitch.tv/oauth2/token` die Parameter `client_id`, `client_secret`, `code`, `redirect_uri` und `grant_type=authorization_code`. Die Antwort enthält `access_token`, `refresh_token` und `expires_in`.
+4. **Konfiguration befüllen** – Hinterlege Benutzername, Kanal, Access- und Refresh-Token sowie das optionale Ablaufdatum (`tokenExpiresAt`) in der Web-Oberfläche. Der Server nutzt anschließend automatisch `https://id.twitch.tv/oauth2/validate` und `https://id.twitch.tv/oauth2/token`, um Tokens zu prüfen bzw. zu erneuern.
 
-### Schnelle Tokens über den Twitch Token Generator
+### 2. Twitch Token Generator (praktisch für Tests)
 
-In der Web-Oberfläche steht zusätzlich eine Schaltfläche **„Twitch Token Generator testen“** bereit. Damit wird [twitchtokengenerator.com](https://twitchtokengenerator.com) geöffnet, wo du testweise ein `oauth:`-Token für Chat-Anwendungen erstellen kannst. Achte darauf, dass der erzeugte Wert mit `oauth:` beginnt – falls nicht, ergänze das Präfix im Formular. Tokens aus diesem Tool besitzen eine begrenzte Gültigkeit und sollten regelmäßig erneuert werden.
+1. Öffne [twitchtokengenerator.com](https://twitchtokengenerator.com) über den Button in der Oberfläche.
+2. Wähle den gewünschten Scope (`chat:read chat:edit`) und aktiviere „Provide Refresh Token“, damit du neben dem Access Token auch einen Refresh Token erhältst.
+3. Übertrage den angezeigten Access Token (ohne `oauth:`-Präfix) sowie den Refresh Token in die erweiterten Felder der Twitch-Konfiguration. Ein separates `oauth:`-Token ist nicht erforderlich – der Server erzeugt automatisch das richtige IRC-Passwort.
+4. Optional kannst du weiterhin klassische `oauth:`-Tokens (z. B. aus älteren Generatoren) in das Hauptfeld eintragen; diese werden unverändert verwendet.
 
-Nach dem Speichern der Konfiguration versucht der Server automatisch, eine Twitch-Chat-Verbindung aufzubauen. Über den Button **„Verbindung testen“** wird `/api/test/twitch` aufgerufen, das mit den gespeicherten Zugangsdaten eine echte Verbindung prüft und das Ergebnis direkt anzeigt. Erfolgreiche sowie fehlgeschlagene Verbindungsversuche werden außerdem im Chat-Log (Server-Sent Events) protokolliert.
+Nach dem Speichern versucht der Server automatisch, eine Twitch-Chat-Verbindung aufzubauen. Über **„Verbindung testen“** wird `/api/test/twitch` aufgerufen. Der Endpoint validiert die gespeicherten Tokens, erneuert sie bei Bedarf und prüft anschließend eine Live-Verbindung zum angegebenen Kanal. Ergebnisse und Warnungen erscheinen zusätzlich im Chat-Log.
 
 ## Weiteres Vorgehen
 

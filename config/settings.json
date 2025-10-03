@@ -4,6 +4,9 @@
     "clientId": "",
     "clientSecret": "",
     "oauthToken": "",
+    "accessToken": "",
+    "refreshToken": "",
+    "tokenExpiresAt": "",
     "channel": ""
   },
   "minecraft": {

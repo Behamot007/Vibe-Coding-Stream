@@ -17,6 +17,9 @@ const defaultConfig = {
     clientId: '',
     clientSecret: '',
     oauthToken: '',
+    accessToken: '',
+    refreshToken: '',
+    tokenExpiresAt: '',
     channel: ''
   },
   minecraft: {
@@ -54,6 +57,21 @@ function saveConfig(config) {
 
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(safeConfig, null, 2));
   return safeConfig;
+}
+
+function persistTwitchConfig(partial = {}) {
+  if (!partial || typeof partial !== 'object') {
+    return loadConfig().twitch;
+  }
+
+  const current = loadConfig();
+  const next = {
+    ...current,
+    twitch: { ...current.twitch, ...partial }
+  };
+
+  saveConfig(next);
+  return next.twitch;
 }
 
 function parseBody(req) {
@@ -153,6 +171,7 @@ function pushChatEntry(entry) {
 
 const twitchChatManager = new TwitchChatManager({
   loadConfig,
+  persistTwitchConfig,
   onChatMessage: ({ username, message }) => {
     pushChatEntry(
       createChatEntry({
@@ -257,29 +276,33 @@ const server = http.createServer(async (req, res) => {
 
       const entry = createChatEntry({ username, message, direction, transport });
 
+      let status = 'stored';
+      let note = 'Chatnachricht wurde gespeichert.';
+      let followUpEntry = null;
+
       if (entry.direction === 'outgoing' && entry.transport === 'twitch') {
         try {
           await twitchChatManager.sendMessage(entry.message);
+          status = 'sent';
+          note = 'Chatnachricht wurde an Twitch übermittelt.';
         } catch (error) {
           console.error('Failed to send Twitch chat message', error);
-          sendJson(res, 502, {
-            message: 'Twitch-Chat Nachricht konnte nicht gesendet werden.',
-            error: error.message
+          status = 'queued';
+          note = `Twitch Versand fehlgeschlagen (${error.message}). Nachricht lokal gespeichert.`;
+          followUpEntry = createChatEntry({
+            username: 'System',
+            message: `Twitch Versand fehlgeschlagen: ${error.message}.`,
+            direction: 'system',
+            transport: 'twitch'
           });
-          return;
         }
       }
 
       pushChatEntry(entry);
 
-      const status =
-        entry.direction === 'outgoing' && entry.transport === 'twitch'
-          ? 'sent'
-          : 'stored';
-      const note =
-        status === 'sent'
-          ? 'Chatnachricht wurde an Twitch übermittelt.'
-          : 'Chatnachricht wurde gespeichert.';
+      if (followUpEntry) {
+        pushChatEntry(followUpEntry);
+      }
 
       sendJson(res, 200, {
         status,
@@ -326,15 +349,19 @@ const server = http.createServer(async (req, res) => {
         sendJson(res, 200, {
           ...responsePayload,
           service: 'twitch',
-          status: 'ok',
+          status: result.status || 'ok',
           message: result.message
         });
       } catch (error) {
-        sendJson(res, 503, {
+        const errorMessage = error?.message || 'Unbekannter Fehler';
+        const status = /konfiguration/i.test(errorMessage)
+          ? 'unconfigured'
+          : 'offline';
+        sendJson(res, 200, {
           ...responsePayload,
           service: 'twitch',
-          status: 'error',
-          message: error.message
+          status,
+          message: errorMessage
         });
       }
       return;
